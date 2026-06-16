@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(mvn test:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn test-compile:*)",
+      "Bash(mvn clean test:*)",
+      "Bash(java:*)",
+      "Bash(mvn help:evaluate:*)",
+      "Bash(docker run:*)"
+    ]
+  }
+}

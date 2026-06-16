@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>选课管理</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/common/custom.css">
+</head>
+<body><div class="app-container">
+<nav class="app-navbar d-flex justify-content-between align-items-center"><span class="navbar-brand">👥 选课管理</span><button class="btn btn-outline-secondary" onclick="navigateTo('/teacher/courses.html')">← 返回</button></nav>
+<div class="glass-card mb-3"><div class="d-flex justify-content-between align-items-center mb-3"><h6 class="mb-0">✅ 已选学生 <span id="enrolledCount" class="badge bg-primary ms-2"></span></h6><button class="btn btn-outline-danger" id="batchRemoveBtn" disabled onclick="batchRemove()">批量移除</button></div><div id="enrolledList" class="text-center py-4"><div class="spinner-custom"></div></div></div>
+<div class="glass-card"><div class="d-flex justify-content-between align-items-center mb-3"><h6 class="mb-0">📋 可选学生</h6><div class="d-flex gap-2"><input class="form-control form-control-sm" id="searchAvail" placeholder="搜索..." style="width:200px;"><button class="btn btn-gradient" id="batchAddBtn" disabled onclick="batchAdd()">添加选中</button></div></div><div id="availableList" class="text-center py-4"><div class="spinner-custom"></div></div></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/common/utils.js"></script>
+<script>
+const courseId=getUrlParam('courseId');let enrolled=[],all=[];
+async function load(){try{[enrolled,all]=await Promise.all([get(`/api/teacher/course/${courseId}/students`),get('/api/teacher/students?size=200')]);renderEnrolled();renderAvailable();}catch(e){if(e.message.includes('未登录'))navigateTo('/teacher/login.html');else showError(e.message);}}
+function renderEnrolled(){const el=document.getElementById('enrolledList');document.getElementById('enrolledCount').textContent=enrolled.length;if(enrolled.length===0){el.innerHTML='<div class="text-center py-3 text-muted">暂无学生</div>';return;}el.innerHTML=`<div class="table-responsive"><table class="table table-hover table-sm"><thead><tr><th><input type="checkbox" id="ca1" onchange="toggleAll(this,'cbE')"></th><th>学号</th><th>姓名</th><th>班级</th></tr></thead><tbody>${enrolled.map(s=>`<tr><td><input type="checkbox" class="cbE" value="${s.id}"></td><td>${escapeHtml(s.studentNo)}</td><td class="fw-semibold">${escapeHtml(s.name)}</td><td>${escapeHtml(s.className)||'-'}</td></tr>`).join('')}</tbody></table></div>`;el.querySelectorAll('.cbE').forEach(c=>c.onchange=updateButtons);}
+function renderAvailable(){const ids=new Set(enrolled.map(s=>s.id));const avail=all.content.filter(s=>!ids.has(s.id));const kw=document.getElementById('searchAvail').value.toLowerCase();const f=kw?avail.filter(s=>(s.name||'').toLowerCase().includes(kw)||(s.studentNo||'').toLowerCase().includes(kw)||(s.className||'').toLowerCase().includes(kw)):avail;const el=document.getElementById('availableList');if(f.length===0){el.innerHTML='<div class="text-center py-3 text-muted">所有学生已选课</div>';return;}el.innerHTML=`<div class="table-responsive" style="max-height:400px;overflow-y:auto;"><table class="table table-hover table-sm"><thead><tr><th><input type="checkbox" id="ca2" onchange="toggleAll(this,'cbA')"></th><th>学号</th><th>姓名</th><th>班级</th></tr></thead><tbody>${f.map(s=>`<tr><td><input type="checkbox" class="cbA" value="${s.id}"></td><td>${escapeHtml(s.studentNo)}</td><td class="fw-semibold">${escapeHtml(s.name)}</td><td>${escapeHtml(s.className)||'-'}</td></tr>`).join('')}</tbody></table></div>`;el.querySelectorAll('.cbA').forEach(c=>c.onchange=updateButtons);}
+function toggleAll(m,c){document.querySelectorAll('.'+c).forEach(b=>b.checked=m.checked);updateButtons();}
+function getChecked(c){return Array.from(document.querySelectorAll('.'+c+':checked')).map(b=>parseInt(b.value));}
+function updateButtons(){document.getElementById('batchAddBtn').disabled=getChecked('cbA').length===0;document.getElementById('batchRemoveBtn').disabled=getChecked('cbE').length===0;}
+async function batchAdd(){const ids=getChecked('cbA');if(!ids.length)return;try{await post(`/api/teacher/course/${courseId}/enroll/batch`,{studentIds:ids});showSuccess(`已添加${ids.length}人`);load();}catch(e){showError(e.message);}}
+async function batchRemove(){const ids=getChecked('cbE');if(!ids.length)return;showConfirm('批量移除',`确定移除${ids.length}人？`,async()=>{try{await fetch(`/api/teacher/course/${courseId}/enroll/batch`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentIds:ids}),credentials:'include'});showSuccess(`已移除${ids.length}人`);load();}catch(e){showError(e.message);}});}
+document.getElementById('searchAvail').oninput=debounce(()=>renderAvailable(),200);
+load();
+</script>
+</body></html>

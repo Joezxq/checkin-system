@@ -1,0 +1,68 @@
+server:
+  port: 3000
+  servlet:
+    context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: checkin-system
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/checkin_system?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: checkin
+    password: checkin123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# 自定义配置
+checkin:
+  network:
+    # 是否启用 X-Forwarded-For 头解析
+    enable-forwarded-header: false
+    # 可信代理 IP 列表
+    trusted-proxies: []
+    # 手动指定服务器 IP（本地开发设为回环地址；部署时改为实际 IP）
+    server-ip-override: "127.0.0.1"
+    # 子网掩码
+    subnet-mask: "255.255.255.0"
+
+  session:
+    # Session 超时时间（分钟）
+    timeout-minutes: 30
+    # Cookie 名称
+    cookie-name: CHECKIN_SESSION
+    # 设备 ID Cookie 名称
+    device-cookie-name: CHECKIN_DEVICE_ID
+
+logging:
+  level:
+    com.checkin: INFO
+    org.hibernate.SQL: WARN
+  file:
+    name: logs/checkin-system.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

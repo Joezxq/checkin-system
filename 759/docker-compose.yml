@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: checkin-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: checkin_system
+      MYSQL_USER: checkin
+      MYSQL_PASSWORD: checkin123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./sql/seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - checkin-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: checkin-app
+    ports:
+      - "3000:3000"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/checkin_system?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: checkin
+      SPRING_DATASOURCE_PASSWORD: checkin123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - checkin-network
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  mysql-data:
+
+networks:
+  checkin-network:
+    driver: bridge
