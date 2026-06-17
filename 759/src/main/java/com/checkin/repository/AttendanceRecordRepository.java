@@ -28,4 +28,6 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
     void deleteBySessionId(Long sessionId);
 
     void deleteByStudentId(Long studentId);
+
+    void findBySessionIdIn(List<Long> collect);
 }

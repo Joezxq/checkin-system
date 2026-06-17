@@ -13,8 +13,8 @@ spring:
 
   datasource:
     url: jdbc:mysql://localhost:3306/checkin_system?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-    username: ${DB_USERNAME:checkin}
-    password: ${DB_PASSWORD:checkin123}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
