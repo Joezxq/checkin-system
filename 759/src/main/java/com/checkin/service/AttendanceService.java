@@ -150,12 +150,12 @@ public class AttendanceService {
             throw new BusinessException(409, "该设备已被使用签到，请使用其他设备");
         }
 
-        // 7. 验证局域网
-        String serverIp = ipUtil.getServerIP();
-        if (!ipUtil.isInSameSubnet(clientIp, serverIp)) {
-            logger.warn("非局域网访问: clientIp={}, serverIp={}", clientIp, serverIp);
-            throw new BusinessException(403, "非局域网访问，禁止签到");
-        }
+        // 7. 验证局域网（已关闭，允许所有设备签到）
+        // String serverIp = ipUtil.getServerIP();
+        // if (!ipUtil.isInSameSubnet(clientIp, serverIp)) {
+        //     logger.warn("非局域网访问: clientIp={}, serverIp={}", clientIp, serverIp);
+        //     throw new BusinessException(403, "非局域网访问，禁止签到");
+        // }
 
         // 8. 生成模拟地理位置
         BigDecimal[] location = GeoUtil.generateMockLocation();
