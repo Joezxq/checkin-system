@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +70,7 @@ public class AttendanceService {
         // 检查是否已有开放的签到活动（自动关闭过期的）
         sessionRepository.findByCourseIdAndStatus(courseId, "OPEN")
             .ifPresent(s -> {
-                if (s.getEndTime() != null && LocalDateTime.now().isAfter(s.getEndTime())) {
+                if (s.getEndTime() != null && LocalDateTime.now(ZoneId.of("Asia/Shanghai")).isAfter(s.getEndTime())) {
                     logger.info("自动关闭过期签到活动: sessionId={}", s.getId());
                     s.setStatus("CLOSED");
                     sessionRepository.save(s);
@@ -80,8 +81,8 @@ public class AttendanceService {
 
         AttendanceSession session = new AttendanceSession();
         session.setCourseId(courseId);
-        session.setStartTime(LocalDateTime.now());
-        session.setEndTime(LocalDateTime.now().plusMinutes(durationMinutes));
+        session.setStartTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
+        session.setEndTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusMinutes(durationMinutes));
         session.setStatus("OPEN");
         // 生成 QR 签到令牌
         session.setQrToken(UUID.randomUUID().toString().replace("-", ""));
@@ -127,7 +128,7 @@ public class AttendanceService {
         }
 
         // 3. 验证活动是否过期（自动关闭）
-        if (session.getEndTime() != null && LocalDateTime.now().isAfter(session.getEndTime())) {
+        if (session.getEndTime() != null && LocalDateTime.now(ZoneId.of("Asia/Shanghai")).isAfter(session.getEndTime())) {
             session.setStatus("CLOSED");
             sessionRepository.save(session);
             throw new BusinessException("签到活动已过期");
@@ -165,7 +166,7 @@ public class AttendanceService {
         record.setSessionId(sessionId);
         record.setCourseId(session.getCourseId());
         record.setStudentId(studentId);
-        record.setSignTime(LocalDateTime.now());
+        record.setSignTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
         record.setClientIp(clientIp);
         record.setClientDeviceId(clientDeviceId);
         record.setGeoLat(location[0]);
@@ -189,7 +190,7 @@ public class AttendanceService {
         }
 
         // 3. 验证活动是否过期（自动关闭）
-        if (session.getEndTime() != null && LocalDateTime.now().isAfter(session.getEndTime())) {
+        if (session.getEndTime() != null && LocalDateTime.now(ZoneId.of("Asia/Shanghai")).isAfter(session.getEndTime())) {
             session.setStatus("CLOSED");
             sessionRepository.save(session);
             throw new BusinessException("签到活动已过期");
@@ -225,7 +226,7 @@ public class AttendanceService {
         record.setSessionId(sessionId);
         record.setCourseId(session.getCourseId());
         record.setStudentId(studentId);
-        record.setSignTime(LocalDateTime.now());
+        record.setSignTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
         record.setClientIp(clientIp);
         record.setClientDeviceId(clientDeviceId);
         record.setGeoLat(location[0]);
