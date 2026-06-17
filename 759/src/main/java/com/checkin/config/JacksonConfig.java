@@ -28,8 +28,12 @@ public class JacksonConfig {
         javaTimeModule.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(dateTimeFormatter));
         javaTimeModule.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(dateTimeFormatter));
 
+        // 继承 spring.jackson 自动配置，追加自定义模块
         return new Jackson2ObjectMapperBuilder()
             .modules(javaTimeModule)
-            .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .timeZone("GMT+8")
+            .dateFormat(new java.text.SimpleDateFormat(DATE_TIME_FORMAT))
+            .serializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL);
     }
 }

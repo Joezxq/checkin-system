@@ -12,7 +12,7 @@ spring:
     name: checkin-system
 
   datasource:
-    url: jdbc:mysql://localhost:3306/checkin_system?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/checkin_system?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -29,6 +29,8 @@ spring:
       hibernate:
         format_sql: false
         dialect: org.hibernate.dialect.MySQL8Dialect
+        jdbc:
+          time_zone: Asia/Shanghai
 
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
