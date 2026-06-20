@@ -18,14 +18,35 @@ public class AttendanceSession {
     @Column(name = "course_id", nullable = false)
     private Long courseId;
 
+    @Column(name = "title", length = 200)
+    private String title;
+
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
 
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
+    @Column(name = "normal_end_time")
+    private LocalDateTime normalEndTime;
+
+    @Column(name = "late_end_time")
+    private LocalDateTime lateEndTime;
+
+    @Column(name = "allow_late", nullable = false)
+    private Boolean allowLate = true;
+
+    @Column(name = "sign_method", nullable = false, length = 20)
+    private String signMethod = "WEB";
+
+    @Column(name = "allow_qr_code", nullable = false)
+    private Boolean allowQrCode = true;
+
+    @Column(name = "allow_device_check", nullable = false)
+    private Boolean allowDeviceCheck = false;
+
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // OPEN, CLOSED
+    private String status; // NOT_STARTED, IN_PROGRESS, CLOSED, EXPIRED, CANCELLED
 
     @Column(name = "qr_token", unique = true, length = 64)
     private String qrToken;
@@ -42,6 +63,9 @@ public class AttendanceSession {
 
     @Transient
     private Double attendanceRate;
+
+    @Transient
+    private String courseName;
 
     @PrePersist
     protected void onCreate() {

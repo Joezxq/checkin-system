@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>风险监控</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/common/custom.css">
+</head>
+<body><div class="app-container">
+<nav class="app-navbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="navbar-brand">⚠️ 风险监控</span>
+    <div class="d-flex gap-2">
+        <button class="btn btn-gradient" id="calcBtn" onclick="calculateRisk()">🔄 重新计算</button>
+        <button class="btn btn-outline-secondary" onclick="navigateTo('/teacher/courses.html')">← 返回</button>
+    </div>
+</nav>
+<div class="mb-3"><select class="form-select" id="courseFilter" onchange="loadRisk()"><option value="">-- 选择课程 --</option></select></div>
+<div class="glass-card"><div id="riskList" class="text-center py-5 text-muted"><div class="spinner-custom"></div></div></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/common/utils.js"></script>
+<script>
+async function loadCourses(){try{const courses=await get('/api/teacher/courses');document.getElementById('courseFilter').innerHTML='<option value="">-- 选择课程 --</option>'+courses.map(c=>`<option value="${c.id}">${escapeHtml(c.courseName)}</option>`).join('');}catch(e){if(e.message.includes('未登录'))navigateTo('/teacher/login.html');}}
+async function loadRisk(){const cid=document.getElementById('courseFilter').value;const el=document.getElementById('riskList');if(!cid){el.innerHTML='<div class="text-center py-5 text-muted">📂 请选择课程</div>';return;}el.innerHTML='<div class="spinner-custom mx-auto"></div>';try{const scores=await get(`/api/teacher/courses/${cid}/risk/scores`);if(!scores||scores.length===0){el.innerHTML='<div class="text-center py-5 text-muted">📭 暂无风险数据，请先关闭签到并点击"重新计算"</div>';return;}const levelBadge=l=>l==='HIGH'?'<span class="badge bg-danger">高风险</span>':l==='MEDIUM'?'<span class="badge bg-warning text-dark">中风险</span>':'<span class="badge bg-success">低风险</span>';const colorBar=s=>s>=70?'bg-danger':s>=40?'bg-warning':'bg-success';el.innerHTML=`<div class="table-responsive"><table class="table table-hover"><thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>风险分</th><th>等级</th><th>风险条形图</th></tr></thead><tbody>${scores.sort((a,b)=>b.score-a.score).map(s=>`<tr><td><small>${escapeHtml(s.studentNo||'-')}</small></td><td>${escapeHtml(s.studentName||'学生'+s.studentId)}</td><td><small>${escapeHtml(s.className||'-')}</small></td><td class="fw-bold">${s.score}</td><td>${levelBadge(s.riskLevel)}</td><td><div class="progress" style="height:8px;"><div class="progress-bar ${colorBar(s.score)}" style="width:${s.score}%"></div></div></td></tr>`).join('')}</tbody></table></div>`;}catch(e){showError(e.message);}}
+async function calculateRisk(){const cid=document.getElementById('courseFilter').value;if(!cid){showError('请先选择课程');return;}const btn=document.getElementById('calcBtn');btn.disabled=true;btn.textContent='⏳ 计算中...';try{await post(`/api/teacher/courses/${cid}/risk/calculate`);showSuccess('风险评分计算完成');loadRisk();}catch(e){showError(e.message);}finally{btn.disabled=false;btn.textContent='🔄 重新计算';}}
+loadCourses();
+</script>
+</body></html>

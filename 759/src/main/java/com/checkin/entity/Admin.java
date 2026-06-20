@@ -9,15 +9,15 @@ import java.time.ZoneId;
 
 @Data
 @Entity
-@Table(name = "student")
-public class Student {
+@Table(name = "admin")
+public class Admin {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "student_no", nullable = false, unique = true, length = 50)
-    private String studentNo;
+    @Column(name = "username", nullable = false, unique = true, length = 50)
+    private String username;
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -25,9 +25,6 @@ public class Student {
     @JsonIgnore
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
-
-    @Column(name = "class_name", length = 100)
-    private String className;
 
     @Column(name = "status", nullable = false, length = 10)
     private String status; // ACTIVE, DISABLED

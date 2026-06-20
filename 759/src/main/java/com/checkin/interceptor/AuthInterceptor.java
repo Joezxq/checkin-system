@@ -42,6 +42,9 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         // 验证角色权限
         String uri = request.getRequestURI();
+        if (uri.startsWith("/api/admin/") && !"ADMIN".equals(userType)) {
+            throw new BusinessException(403, "无权限访问");
+        }
         if (uri.startsWith("/api/student/") && !"STUDENT".equals(userType)) {
             throw new BusinessException(403, "无权限访问");
         }

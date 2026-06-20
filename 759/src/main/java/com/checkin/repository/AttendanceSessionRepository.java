@@ -44,4 +44,6 @@ public interface AttendanceSessionRepository extends JpaRepository<AttendanceSes
         @Param("dateTo") LocalDateTime dateTo,
         Pageable pageable
     );
+
+    long countByStatus(String status);
 }

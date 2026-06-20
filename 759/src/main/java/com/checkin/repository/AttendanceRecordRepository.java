@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -29,5 +30,8 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
 
     void deleteByStudentId(Long studentId);
 
-    void findBySessionIdIn(List<Long> collect);
+    List<AttendanceRecord> findBySessionIdIn(List<Long> sessionIds);
+
+    @Query("SELECT COUNT(r) FROM AttendanceRecord r WHERE r.signTime >= :start AND r.signTime < :end")
+    long countBySignTimeBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

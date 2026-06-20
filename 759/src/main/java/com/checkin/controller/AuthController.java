@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
+import java.util.Map;
 
 /**
  * 认证控制器
@@ -50,6 +51,19 @@ public class AuthController {
             request.getTeacherNo(), request.getName(),
             request.getPassword(), request.getConfirmPassword(), session);
         return Result.success(teacher);
+    }
+
+    /**
+     * 管理员登录
+     */
+    @PostMapping("/admin/login")
+    public Result<?> adminLogin(@RequestBody Map<String, String> body, HttpSession session) {
+        String username = body.get("username");
+        String password = body.get("password");
+        if (username == null || password == null) {
+            return Result.error(400, "用户名和密码不能为空");
+        }
+        return Result.success(authService.adminLogin(username, password, session));
     }
 
     /**

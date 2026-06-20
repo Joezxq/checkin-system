@@ -1,8 +1,10 @@
 package com.checkin.service;
 
+import com.checkin.entity.Admin;
 import com.checkin.entity.Student;
 import com.checkin.entity.Teacher;
 import com.checkin.exception.BusinessException;
+import com.checkin.repository.AdminRepository;
 import com.checkin.repository.StudentRepository;
 import com.checkin.repository.TeacherRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +26,13 @@ public class AuthService {
     private TeacherRepository teacherRepository;
 
     @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private OperationLogService logService;
 
     /**
      * 学生登录
@@ -37,11 +45,16 @@ public class AuthService {
             throw new BusinessException("学号或密码错误");
         }
 
+        if ("DISABLED".equals(student.getStatus())) {
+            throw new BusinessException("此账号已被禁用，请联系管理员");
+        }
+
         // 设置 Session
         session.setAttribute("userType", "STUDENT");
         session.setAttribute("userId", student.getId());
         session.setAttribute("userName", student.getName());
 
+        logService.log("STUDENT", student.getId(), student.getName(), "LOGIN", "Student", student.getId(), null, null);
         return student;
     }
 
@@ -56,11 +69,16 @@ public class AuthService {
             throw new BusinessException("工号或密码错误");
         }
 
+        if ("DISABLED".equals(teacher.getStatus())) {
+            throw new BusinessException("此账号已被禁用，请联系管理员");
+        }
+
         // 设置 Session
         session.setAttribute("userType", "TEACHER");
         session.setAttribute("userId", teacher.getId());
         session.setAttribute("userName", teacher.getName());
 
+        logService.log("TEACHER", teacher.getId(), teacher.getName(), "LOGIN", "Teacher", teacher.getId(), null, null);
         return teacher;
     }
 
@@ -99,9 +117,40 @@ public class AuthService {
     }
 
     /**
+     * 管理员登录
+     */
+    public Admin adminLogin(String username, String password, HttpSession session) {
+        Admin admin = adminRepository.findByUsername(username)
+            .orElseThrow(() -> new BusinessException("用户名或密码错误"));
+
+        if (!passwordEncoder.matches(password, admin.getPasswordHash())) {
+            throw new BusinessException("用户名或密码错误");
+        }
+
+        if ("DISABLED".equals(admin.getStatus())) {
+            throw new BusinessException("此账号已被禁用");
+        }
+
+        session.setAttribute("userType", "ADMIN");
+        session.setAttribute("userId", admin.getId());
+        session.setAttribute("userName", admin.getName());
+
+        logService.log("ADMIN", admin.getId(), admin.getName(), "LOGIN", "Admin", admin.getId(), null, null);
+        return admin;
+    }
+
+    /**
      * 登出
      */
     public void logout(HttpSession session) {
+        Object userType = session.getAttribute("userType");
+        Object userId = session.getAttribute("userId");
+        Object userName = session.getAttribute("userName");
+        if (userType != null && userId != null) {
+            logService.log(userType.toString(), (Long) userId,
+                userName != null ? userName.toString() : null,
+                "LOGOUT", null, null, null, null);
+        }
         session.invalidate();
     }
 }

@@ -26,6 +26,9 @@ public class Teacher {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "status", nullable = false, length = 10)
+    private String status; // ACTIVE, DISABLED
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -19,7 +19,20 @@
 <script src="/common/utils.js"></script>
 <script>
 const courseId=getUrlParam('courseId');let activeSessionId=null;
-async function checkSession(){try{const session=await get(`/api/student/course/${courseId}/active-session`);const el=document.getElementById('content');if(!session){el.innerHTML='<div class="alert alert-info text-center">📭 当前暂无签到活动</div>';return;}activeSessionId=session.id;const check=await get(`/api/student/session/${session.id}/check`);const hasSigned=check.hasSigned;el.innerHTML=`<h5 class="mb-3">📋 签到进行中</h5><div class="d-flex justify-content-center gap-4 mb-4 text-muted small"><span>${formatDateTime(session.startTime)}</span><span>→ ${session.endTime?formatDateTime(session.endTime):'--'}</span></div>${hasSigned?'<button class="btn btn-success sign-btn mx-auto my-3" disabled><span class="fs-3">✓</span><br>已签到</button><p class="text-success mt-2">您已完成签到</p>':'<button class="btn btn-success sign-btn mx-auto my-3 py-0" onclick="signIn('+session.id+')">点击<br>签到</button>'}`;}catch(e){if(e.message.includes('未登录'))navigateTo('/student/login.html');else showError(e.message);}}
+async function checkSession(){try{const session=await get(`/api/student/course/${courseId}/active-session`);const el=document.getElementById('content');if(!session){el.innerHTML='<div class="alert alert-info text-center">📭 当前暂无签到活动</div>';return;}activeSessionId=session.id;const check=await get(`/api/student/session/${session.id}/check`);const hasSigned=check.hasSigned;
+const normalEnd=session.normalEndTime?formatDateTime(session.normalEndTime):null;
+const lateEnd=session.lateEndTime?formatDateTime(session.lateEndTime):null;
+const titleHtml=session.title?`<div class="badge bg-light text-dark mb-2 fs-6">${escapeHtml(session.title)}</div><br>`:'';
+const timeHtml=`<div class="d-flex flex-column align-items-center gap-1 mb-3 text-muted small">
+    <span>⏰ 开始: ${formatDateTime(session.startTime)}</span>
+    ${normalEnd?`<span>✅ 正常截止: ${normalEnd}</span>`:''}
+    ${lateEnd?`<span class="text-warning">⚠️ 迟到截止: ${lateEnd}</span>`:''}
+</div>`;
+if(hasSigned){
+    el.innerHTML=`<h5 class="mb-3">📋 签到进行中</h5>${titleHtml}${timeHtml}<button class="btn btn-success sign-btn mx-auto my-3" disabled><span class="fs-3">✓</span><br>已签到</button><p class="text-success mt-2">您已完成签到</p>`;
+}else{
+    el.innerHTML=`<h5 class="mb-3">📋 签到进行中</h5>${titleHtml}${timeHtml}<button class="btn btn-success sign-btn mx-auto my-3 py-0" onclick="signIn(${session.id})">点击<br>签到</button>`;
+}}catch(e){if(e.message.includes('未登录'))navigateTo('/student/login.html');else showError(e.message);}}
 async function signIn(id){try{await post(`/api/student/session/${id}/sign`);showSuccess('签到成功！');setTimeout(checkSession,1000);}catch(e){showError(e.message);}}
 async function qrSignIn(){const input=document.getElementById('qrInput').value.trim();const errEl=document.getElementById('qrError');errEl.classList.add('d-none');if(!input){errEl.textContent='请输入QR码文本';errEl.classList.remove('d-none');return;}const parts=input.split(':');if(parts.length<3||parts[0]!=='CHECKIN'){errEl.textContent='无效的QR码格式';errEl.classList.remove('d-none');return;}const sid=parts[1];const token=parts.slice(2).join(':');try{const result=await post(`/api/student/session/${sid}/qrsign`,{token});showSuccess('扫码签到成功！');document.getElementById('qrInput').value='';if(sid==activeSessionId)setTimeout(checkSession,1000);}catch(e){errEl.textContent=e.message;errEl.classList.remove('d-none');}}
 checkSession();

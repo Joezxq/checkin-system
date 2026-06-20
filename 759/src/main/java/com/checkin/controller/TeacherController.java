@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
@@ -36,6 +37,15 @@ public class TeacherController {
 
     @Autowired
     private AttendanceService attendanceService;
+
+    @Autowired
+    private LeaveService leaveService;
+
+    @Autowired
+    private ExportService exportService;
+
+    @Autowired
+    private RiskService riskService;
 
     // ==================== 课程管理 ====================
 
@@ -279,7 +289,17 @@ public class TeacherController {
         Long teacherId = (Long) session.getAttribute("userId");
         Integer durationMinutes = (request != null && request.getDurationMinutes() != null)
             ? request.getDurationMinutes() : 10;
-        AttendanceSession attendanceSession = attendanceService.openSession(courseId, durationMinutes, teacherId);
+        String title = (request != null) ? request.getTitle() : null;
+        Integer normalEndTimeMinutes = (request != null) ? request.getNormalEndTimeMinutes() : null;
+        Integer lateEndTimeMinutes = (request != null) ? request.getLateEndTimeMinutes() : null;
+        Boolean allowLate = (request != null) ? request.getAllowLate() : true;
+        String signMethod = (request != null && request.getSignMethod() != null) ? request.getSignMethod() : "WEB";
+        Boolean allowQrCode = (request != null) ? request.getAllowQrCode() : true;
+        Boolean allowDeviceCheck = (request != null) ? request.getAllowDeviceCheck() : false;
+        AttendanceSession attendanceSession = attendanceService.openSession(
+            courseId, durationMinutes, title, normalEndTimeMinutes, lateEndTimeMinutes,
+            allowLate, signMethod, allowQrCode, allowDeviceCheck, teacherId
+        );
         return Result.success(attendanceSession);
     }
 
@@ -367,5 +387,247 @@ public class TeacherController {
         result.put("currentPage", page);
 
         return Result.success(result);
+    }
+
+    // ==================== 签到活动管理（扩展） ====================
+
+    /**
+     * 延长签到活动
+     */
+    @PostMapping("/sessions/{sessionId}/extend")
+    public Result<AttendanceSession> extendSession(
+        @PathVariable Long sessionId,
+        @Valid @RequestBody ExtendSessionRequest request,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        AttendanceSession attendanceSession = attendanceService.extendSession(
+            sessionId, request.getExtendMinutes(), teacherId
+        );
+        return Result.success(attendanceSession);
+    }
+
+    /**
+     * 修改签到活动时间
+     */
+    @PutMapping("/sessions/{sessionId}/time")
+    public Result<AttendanceSession> modifySessionTime(
+        @PathVariable Long sessionId,
+        @RequestBody Map<String, String> body,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime startTime = body.containsKey("startTime") ? LocalDateTime.parse(body.get("startTime"), fmt) : null;
+        LocalDateTime normalEndTime = body.containsKey("normalEndTime") ? LocalDateTime.parse(body.get("normalEndTime"), fmt) : null;
+        LocalDateTime lateEndTime = body.containsKey("lateEndTime") ? LocalDateTime.parse(body.get("lateEndTime"), fmt) : null;
+        AttendanceSession attendanceSession = attendanceService.modifySessionTime(
+            sessionId, startTime, normalEndTime, lateEndTime, teacherId
+        );
+        return Result.success(attendanceSession);
+    }
+
+    /**
+     * 取消签到活动
+     */
+    @PostMapping("/sessions/{sessionId}/cancel")
+    public Result<AttendanceSession> cancelSession(
+        @PathVariable Long sessionId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        AttendanceSession attendanceSession = attendanceService.cancelSession(sessionId, teacherId);
+        return Result.success(attendanceSession);
+    }
+
+    // ==================== 请假管理 ====================
+
+    /**
+     * 批准请假
+     */
+    @PostMapping("/leaves/{leaveId}/approve")
+    public Result<LeaveRequest> approveLeave(
+        @PathVariable Long leaveId,
+        @Valid @RequestBody LeaveApproveRequest request,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        LeaveRequest leave = leaveService.approveLeave(leaveId, request.getComment(), teacherId);
+        return Result.success(leave);
+    }
+
+    /**
+     * 驳回请假
+     */
+    @PostMapping("/leaves/{leaveId}/reject")
+    public Result<LeaveRequest> rejectLeave(
+        @PathVariable Long leaveId,
+        @Valid @RequestBody LeaveApproveRequest request,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        LeaveRequest leave = leaveService.rejectLeave(leaveId, request.getComment(), teacherId);
+        return Result.success(leave);
+    }
+
+    /**
+     * 获取课程待审核请假列表
+     */
+    @GetMapping("/courses/{courseId}/leaves/pending")
+    public Result<List<LeaveRequest>> getPendingLeaves(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        List<LeaveRequest> leaves = leaveService.getPendingLeaves(courseId, teacherId);
+        return Result.success(leaves);
+    }
+
+    /**
+     * 获取课程所有请假列表
+     */
+    @GetMapping("/courses/{courseId}/leaves")
+    public Result<List<LeaveRequest>> getCourseLeaves(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        List<LeaveRequest> leaves = leaveService.getAllCourseLeaves(courseId, teacherId);
+        return Result.success(leaves);
+    }
+
+    // ==================== 数据看板与统计 ====================
+
+    /**
+     * 获取课程数据看板
+     */
+    @GetMapping("/courses/{courseId}/dashboard")
+    public Result<Map<String, Object>> getCourseDashboard(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        Map<String, Object> dashboard = attendanceService.getCourseDashboard(courseId, teacherId);
+        return Result.success(dashboard);
+    }
+
+    /**
+     * 获取出勤趋势
+     */
+    @GetMapping("/courses/{courseId}/trend")
+    public Result<List<Map<String, Object>>> getCourseTrend(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        List<Map<String, Object>> trend = attendanceService.getCourseTrend(courseId, teacherId);
+        return Result.success(trend);
+    }
+
+    /**
+     * 获取状态分布
+     */
+    @GetMapping("/courses/{courseId}/distribution")
+    public Result<Map<String, Object>> getStatusDistribution(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        Map<String, Object> distribution = attendanceService.getStatusDistribution(courseId, teacherId);
+        return Result.success(distribution);
+    }
+
+    // ==================== 风险预警 ====================
+
+    @PostMapping("/courses/{courseId}/risk/calculate")
+    public Result<Map<String, Object>> calculateRisk(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        int count = riskService.calculateCourseRiskScores(courseId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("calculatedCount", count);
+        result.put("message", "风险评分计算完成");
+        return Result.success(result);
+    }
+
+    @GetMapping("/courses/{courseId}/risk/scores")
+    public Result<List<RiskScore>> getRiskScores(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        return Result.success(riskService.getCourseRiskScores(courseId));
+    }
+
+    @GetMapping("/courses/{courseId}/risk/high-risk")
+    public Result<List<RiskScore>> getHighRiskStudents(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        return Result.success(riskService.getHighRiskStudents(courseId));
+    }
+
+    // ==================== 数据导出 ====================
+
+    /**
+     * 导出单次签到记录
+     */
+    @GetMapping("/export/session/{sessionId}")
+    public ResponseEntity<byte[]> exportSession(
+        @PathVariable Long sessionId,
+        @RequestParam(defaultValue = "csv") String format,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        byte[] data;
+        String contentType, filename;
+        if ("xlsx".equalsIgnoreCase(format)) {
+            data = exportService.exportSessionExcel(sessionId, teacherId);
+            contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            filename = "session_" + sessionId + ".xlsx";
+        } else {
+            data = exportService.exportSessionCSV(sessionId, teacherId);
+            contentType = "text/csv;charset=UTF-8";
+            filename = "session_" + sessionId + ".csv";
+        }
+        return createResponse(data, contentType, filename);
+    }
+
+    /**
+     * 导出课程考勤汇总
+     */
+    @GetMapping("/export/course/{courseId}")
+    public ResponseEntity<byte[]> exportCourse(
+        @PathVariable Long courseId,
+        @RequestParam(defaultValue = "csv") String format,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        byte[] data = exportService.exportCourseSummaryCSV(courseId, teacherId);
+        String filename = "course_summary_" + courseId + ".csv";
+        return createResponse(data, "text/csv;charset=UTF-8", filename);
+    }
+
+    /**
+     * 导出请假记录
+     */
+    @GetMapping("/export/leaves/{courseId}")
+    public ResponseEntity<byte[]> exportLeaves(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long teacherId = (Long) session.getAttribute("userId");
+        byte[] data = exportService.exportLeavesCSV(courseId, teacherId);
+        String filename = "leaves_" + courseId + ".csv";
+        return createResponse(data, "text/csv;charset=UTF-8", filename);
+    }
+
+    private ResponseEntity<byte[]> createResponse(byte[] data, String contentType, String filename) {
+        return ResponseEntity.ok()
+            .header("Content-Type", contentType)
+            .header("Content-Disposition", "attachment; filename*=UTF-8''" + java.net.URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"))
+            .header("Content-Length", String.valueOf(data.length))
+            .body(data);
     }
 }

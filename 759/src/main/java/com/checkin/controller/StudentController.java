@@ -1,13 +1,16 @@
 package com.checkin.controller;
 
+import com.checkin.dto.LeaveSubmitRequest;
 import com.checkin.dto.Result;
 import com.checkin.entity.AttendanceRecord;
 import com.checkin.entity.AttendanceSession;
 import com.checkin.entity.Course;
 import com.checkin.entity.Enrollment;
+import com.checkin.entity.LeaveRequest;
 import com.checkin.service.AttendanceService;
 import com.checkin.service.CourseService;
 import com.checkin.service.EnrollmentService;
+import com.checkin.service.LeaveService;
 import com.checkin.util.DeviceUtil;
 import com.checkin.util.IPUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +46,9 @@ public class StudentController {
 
     @Autowired
     private DeviceUtil deviceUtil;
+
+    @Autowired
+    private LeaveService leaveService;
 
     /**
      * 获取学生的课程列表
@@ -158,5 +165,77 @@ public class StudentController {
         result.put("message", "扫码签到成功");
 
         return Result.success(result);
+    }
+
+    // ==================== 请假管理 ====================
+
+    /**
+     * 学生提交请假申请
+     */
+    @PostMapping("/leave")
+    public Result<LeaveRequest> submitLeave(
+        @Valid @RequestBody LeaveSubmitRequest request,
+        HttpSession session
+    ) {
+        Long studentId = (Long) session.getAttribute("userId");
+        LeaveRequest leave = leaveService.submitLeave(
+            request.getCourseId(),
+            request.getSessionId(),
+            studentId,
+            request.getLeaveType(),
+            request.getReason()
+        );
+        return Result.success(leave);
+    }
+
+    /**
+     * 获取学生所有请假记录
+     */
+    @GetMapping("/leaves")
+    public Result<List<LeaveRequest>> getLeaves(HttpSession session) {
+        Long studentId = (Long) session.getAttribute("userId");
+        List<LeaveRequest> leaves = leaveService.getStudentLeaves(studentId);
+        return Result.success(leaves);
+    }
+
+    /**
+     * 获取学生在某课程下的请假记录
+     */
+    @GetMapping("/courses/{courseId}/leaves")
+    public Result<List<LeaveRequest>> getCourseLeaves(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long studentId = (Long) session.getAttribute("userId");
+        List<LeaveRequest> leaves = leaveService.getStudentLeavesForCourse(studentId, courseId);
+        return Result.success(leaves);
+    }
+
+    // ==================== 考勤记录 ====================
+
+    /**
+     * 获取学生在某课程下的考勤历史
+     */
+    @GetMapping("/courses/{courseId}/attendance")
+    public Result<List<Map<String, Object>>> getAttendanceHistory(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long studentId = (Long) session.getAttribute("userId");
+        List<Map<String, Object>> history = attendanceService.getStudentAttendanceHistory(studentId, courseId);
+        return Result.success(history);
+    }
+
+    /**
+     * 获取学生在某课程下的考勤统计摘要
+     */
+    @GetMapping("/courses/{courseId}/attendance/summary")
+    public Result<Map<String, Object>> getAttendanceSummary(
+        @PathVariable Long courseId,
+        HttpSession session
+    ) {
+        Long studentId = (Long) session.getAttribute("userId");
+        Map<String, Object> summary = attendanceService.getStudentCourseStatistics(studentId, courseId);
+        return Result.success(summary);
     }
 }

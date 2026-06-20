@@ -54,6 +54,7 @@ public class StudentService {
         student.setName(name);
         student.setPasswordHash(passwordEncoder.encode(password));
         student.setClassName(className);
+        student.setStatus("ACTIVE");
         return studentRepository.save(student);
     }
 
@@ -119,6 +120,33 @@ public class StudentService {
             student.setPasswordHash(passwordEncoder.encode(password));
         }
         student.setClassName(className);
+        return studentRepository.save(student);
+    }
+
+    /**
+     * 重置学生密码（管理员操作）
+     */
+    @Transactional
+    public void updateStudentPassword(Long studentId, String newPassword) {
+        validatePassword(newPassword);
+        Student student = studentRepository.findById(studentId)
+            .orElseThrow(() -> new BusinessException("学生不存在"));
+        student.setPasswordHash(passwordEncoder.encode(newPassword));
+        studentRepository.save(student);
+    }
+
+    /**
+     * 切换学生账号启用/禁用状态
+     */
+    @Transactional
+    public Student toggleStudentStatus(Long studentId) {
+        Student student = studentRepository.findById(studentId)
+            .orElseThrow(() -> new BusinessException("学生不存在"));
+        if ("ACTIVE".equals(student.getStatus())) {
+            student.setStatus("DISABLED");
+        } else {
+            student.setStatus("ACTIVE");
+        }
         return studentRepository.save(student);
     }
 
