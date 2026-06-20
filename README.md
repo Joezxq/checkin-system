@@ -55,8 +55,7 @@ FLUSH PRIVILEGES;
 ```bash
 mysql -u checkin -pcheckin123 checkin_system < sql/schema.sql
 mysql -u checkin -pcheckin123 checkin_system < sql/seed.sql
-mysql -u checkin -pcheckin123 checkin_system < sql/migration_v2.sql
-mysql -u checkin -pcheckin123 checkin_system < sql/migration_v3.sql
+
 ```
 
 ### 4. 启动应用
@@ -162,8 +161,6 @@ checkin:
 ├── sql/
 │   ├── schema.sql          # 表结构
 │   ├── seed.sql             # 测试数据
-│   ├── migration_v2.sql     # QR令牌迁移
-│   └── migration_v3.sql     # 外键+索引迁移
 ├── src/main/java/com/checkin/
 │   ├── CheckinSystemApplication.java
 │   ├── config/              # Web/MVC/密码配置
