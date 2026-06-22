@@ -66,7 +66,7 @@
 <script src="/common/utils.js"></script>
 <script>
 const sessionId=getUrlParam('sessionId');
-let refresh=null, qr=null, wasActive=false;
+let refresh=null, qr=null, wasActive=false, _polling=true;
 const extendModal=new bootstrap.Modal(document.getElementById('extendModal'));
 
 async function load(){
@@ -117,11 +117,12 @@ async function load(){
 
     // Stop polling when inactive
     if(!isActive && wasActive) {
+        _polling=false;
         document.getElementById('closeBtn').style.display='none';
         document.getElementById('extendBtn').style.display='none';
         document.getElementById('qrcode').innerHTML='<div class="alert alert-warning text-center mb-0">签到已结束</div>';
         document.getElementById('qrText').textContent='';
-        if(refresh) { clearInterval(refresh); refresh=null; }
+        if(refresh) { clearTimeout(refresh); refresh=null; }
     }
     if(isActive) {
         document.getElementById('closeBtn').style.display='';
@@ -182,8 +183,9 @@ async function doExtend(minutes){
 async function closeSession(){
     showConfirm('关闭签到','确定关闭吗？关闭后将自动生成考勤结果。',async()=>{
         try{
+            _polling=false;
             const s=await post(`/api/teacher/sessions/${sessionId}/close`);
-            if(refresh){clearInterval(refresh);refresh=null;}
+            if(refresh){clearTimeout(refresh);refresh=null;}
             document.getElementById('closeBtn').style.display='none';
             document.getElementById('extendBtn').style.display='none';
             document.getElementById('qrcode').innerHTML='<div class="alert alert-warning text-center mb-0">已关闭</div>';
@@ -213,13 +215,16 @@ function showStats(s){
 }
 
 function leavePage(){
-    if(refresh){clearInterval(refresh);refresh=null;}
+    _polling=false;
+    if(refresh){clearTimeout(refresh);refresh=null;}
     navigateTo('/teacher/courses.html');
 }
 
 // Start polling
 load();
-refresh=setInterval(load, 3000);
-window.addEventListener('beforeunload',()=>{if(refresh)clearInterval(refresh);});
+// 使用 setTimeout 递归避免请求重叠
+function schedulePoll(){if(_polling)refresh=setTimeout(()=>{load().finally(schedulePoll);},3000);}
+schedulePoll();
+window.addEventListener('beforeunload',()=>{if(refresh){clearTimeout(refresh);refresh=null;}});
 </script>
 </body></html>

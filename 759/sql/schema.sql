@@ -76,7 +76,7 @@ CREATE TABLE `attendance_session` (
                                       `course_id` BIGINT NOT NULL COMMENT '课程ID',
                                       `start_time` DATETIME NOT NULL COMMENT '开始时间',
                                       `end_time` DATETIME DEFAULT NULL COMMENT '结束时间',
-                                      `status` VARCHAR(20) NOT NULL DEFAULT 'OPEN' COMMENT '状态：OPEN-开放，CLOSED-关闭',
+                                      `status` VARCHAR(20) NOT NULL DEFAULT 'NOT_STARTED' COMMENT '状态: NOT_STARTED/IN_PROGRESS/CLOSED/EXPIRED/CANCELLED',
                                       `qr_token` VARCHAR(64) DEFAULT NULL COMMENT 'QR签到令牌',  -- v2: QR令牌字段
                                       `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                                       PRIMARY KEY (`id`),

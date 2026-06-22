@@ -251,14 +251,18 @@ public class LeaveService {
      * 获取学生的所有请假记录
      */
     public List<LeaveRequest> getStudentLeaves(Long studentId) {
-        return leaveRequestRepository.findByStudentId(studentId);
+        List<LeaveRequest> leaves = leaveRequestRepository.findByStudentId(studentId);
+        populateTransientFields(leaves);
+        return leaves;
     }
 
     /**
      * 获取学生在某课程下的请假记录
      */
     public List<LeaveRequest> getStudentLeavesForCourse(Long studentId, Long courseId) {
-        return leaveRequestRepository.findByCourseIdAndStudentId(courseId, studentId);
+        List<LeaveRequest> leaves = leaveRequestRepository.findByCourseIdAndStudentId(courseId, studentId);
+        populateTransientFields(leaves);
+        return leaves;
     }
 
     /**

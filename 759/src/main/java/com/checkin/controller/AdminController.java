@@ -239,8 +239,12 @@ public class AdminController {
 
     @PutMapping("/configs")
     public Result<SystemConfig> updateConfig(@RequestBody Map<String, String> body, HttpSession session) {
+        String key = body.get("key");
+        String value = body.get("value");
+        if (key == null || key.isEmpty()) return Result.error(400, "配置键不能为空");
+        if (value == null) return Result.error(400, "配置值不能为空");
         Long adminId = (Long) session.getAttribute("userId");
-        return Result.success(configService.updateConfig(body.get("key"), body.get("value"), adminId));
+        return Result.success(configService.updateConfig(key, value, adminId));
     }
 
     // ==================== 操作日志 ====================

@@ -246,12 +246,12 @@ public class AttendanceService {
                         && !record.getSignTime().isAfter(session.getLateEndTime())) {
                     result.setStatus(AttendanceStatus.LATE.name());
                 } else if (session.getNormalEndTime() != null) {
-                    // 签到时间晚于截止时间：允许迟到则标记LATE，否则ABSENT
+                    // 签到晚于正常截止时间
                     if (session.getAllowLate() && session.getLateEndTime() != null) {
-                        // 允许迟到且签到在迟到截止之后 -> 缺勤
+                        // 有迟到宽限且签到在迟到截止之后 -> 缺勤
                         result.setStatus(AttendanceStatus.ABSENT.name());
-                    } else if (!session.getAllowLate()) {
-                        // 不允许迟到 -> 缺勤
+                    } else if (!session.getAllowLate() || session.getLateEndTime() == null) {
+                        // 不允许迟到 或 迟到时间为空 -> 缺勤
                         result.setStatus(AttendanceStatus.ABSENT.name());
                     } else {
                         result.setStatus(AttendanceStatus.LATE.name());
@@ -433,7 +433,7 @@ public class AttendanceService {
         // 7. 生成模拟地理位置
         BigDecimal[] location = GeoUtil.generateMockLocation();
 
-        // 8. 创建签到记录
+        // 8. 创建签到记录（捕获并发冲突）
         AttendanceRecord record = new AttendanceRecord();
         record.setSessionId(sessionId);
         record.setCourseId(session.getCourseId());
@@ -444,7 +444,11 @@ public class AttendanceService {
         record.setGeoLat(location[0]);
         record.setGeoLng(location[1]);
 
-        return recordRepository.save(record);
+        try {
+            return recordRepository.save(record);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new BusinessException(409, "签到冲突，请勿重复签到或使用他人设备");
+        }
     }
 
     /**
@@ -504,7 +508,11 @@ public class AttendanceService {
         record.setGeoLat(location[0]);
         record.setGeoLng(location[1]);
 
-        return recordRepository.save(record);
+        try {
+            return recordRepository.save(record);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new BusinessException(409, "签到冲突，请勿重复签到或使用他人设备");
+        }
     }
 
     /**
