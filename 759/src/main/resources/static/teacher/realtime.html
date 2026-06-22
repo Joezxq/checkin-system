@@ -70,6 +70,7 @@ let refresh=null, qr=null, wasActive=false, _polling=true;
 const extendModal=new bootstrap.Modal(document.getElementById('extendModal'));
 
 async function load(){
+    try{
     const d=await get(`/api/teacher/sessions/${sessionId}/realtime`);
     window._lastCourseId=d.courseId; // 供二维码URL使用
     // 异步加载风险数据（不阻塞主流程）
@@ -129,6 +130,10 @@ async function load(){
         document.getElementById('extendBtn').style.display='';
     }
     wasActive = isActive;
+    }catch(e){
+        if(e.message&&e.message.includes('未登录')){_polling=false;navigateTo('/teacher/login.html');}
+        else console.error('实时数据加载失败:', e);
+    }
 }
 
 function renderSignedList(d){
@@ -220,11 +225,10 @@ function leavePage(){
     navigateTo('/teacher/courses.html');
 }
 
-// Start polling
+// Start: 立即加载，完成后每3秒轮询一次（递归setTimeout避免请求重叠）
 load();
-// 使用 setTimeout 递归避免请求重叠
-function schedulePoll(){if(_polling)refresh=setTimeout(()=>{load().finally(schedulePoll);},3000);}
-schedulePoll();
-window.addEventListener('beforeunload',()=>{if(refresh){clearTimeout(refresh);refresh=null;}});
+function scheduleNext(){if(!_polling)return;refresh=setTimeout(()=>{load().finally(()=>scheduleNext());},3000);}
+scheduleNext();
+window.addEventListener('beforeunload',()=>{_polling=false;if(refresh){clearTimeout(refresh);refresh=null;}});
 </script>
 </body></html>
