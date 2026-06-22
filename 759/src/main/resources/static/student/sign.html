@@ -47,11 +47,15 @@ async function qrSignIn(sid,token){if(!sid)sid=activeSessionId;const input=docum
     const sid=getUrlParam('sid');
     const token=getUrlParam('token');
     if(sid&&token){
+        // 扫码签到路径：直接自动提交，不加载手动签到UI
+        document.getElementById('content').innerHTML='<div class="text-center py-5"><div class="spinner-custom"></div><p class="text-muted mt-2">正在扫码签到...</p></div>';
         document.getElementById('qrInput').value='CHECKIN:'+sid+':'+token;
-        // 等待页面加载完成后自动提交
-        setTimeout(()=>{if(!window._autoSigned)qrSignIn(sid,token);},1500);
+        setTimeout(()=>{if(!window._autoSigned)qrSignIn(sid,token);},800);
+        // 自动签到成功后刷新显示状态
+        setTimeout(()=>{if(window._autoSigned)checkSession();},2000);
+    }else{
+        checkSession();
     }
 })();
-checkSession();
 </script>
 </body></html>

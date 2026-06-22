@@ -271,10 +271,34 @@ function animateList(selector, baseDelay = 0.05) {
     });
 }
 
-// 全局关闭拼写检查（避免中文输入框出现红色波浪线）
+// 全局关闭拼写检查
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input:not([type=password]):not([type=checkbox]), textarea').forEach(el => {
         el.setAttribute('spellcheck', 'false');
         el.setAttribute('autocomplete', 'off');
     });
+    // 自动加载当前登录用户姓名，注入到所有页面导航栏
+    loadUserName();
 });
+
+async function loadUserName() {
+    try {
+        const me = await get('/api/auth/me');
+        const name = me.userName;
+        if (!name) return;
+        // 在所有 .navbar-brand 元素后插入用户名
+        document.querySelectorAll('.navbar-brand').forEach(el => {
+            // 避免重复插入
+            if (!el.querySelector('.user-name-badge')) {
+                const badge = document.createElement('span');
+                badge.className = 'user-name-badge badge bg-light text-dark ms-2';
+                badge.style.fontSize = '0.8rem';
+                badge.style.fontWeight = 'normal';
+                badge.textContent = '👤 ' + name;
+                el.appendChild(badge);
+            }
+        });
+    } catch(e) {
+        // 未登录或请求失败时静默处理
+    }
+}

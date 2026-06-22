@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -64,6 +65,22 @@ public class AuthController {
             return Result.error(400, "用户名和密码不能为空");
         }
         return Result.success(authService.adminLogin(username, password, session));
+    }
+
+    /**
+     * 获取当前登录用户信息
+     */
+    @GetMapping("/me")
+    public Result<Map<String, Object>> getCurrentUser(HttpSession session) {
+        Object userType = session.getAttribute("userType");
+        if (userType == null) {
+            return Result.error(401, "未登录");
+        }
+        Map<String, Object> user = new HashMap<>();
+        user.put("userType", userType);
+        user.put("userId", session.getAttribute("userId"));
+        user.put("userName", session.getAttribute("userName"));
+        return Result.success(user);
     }
 
     /**

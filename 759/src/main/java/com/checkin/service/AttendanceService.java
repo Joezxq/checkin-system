@@ -196,7 +196,8 @@ public class AttendanceService {
             .filter(lr -> lr.getSessionId() == null || lr.getSessionId().equals(sessionId))
             .collect(Collectors.toList());
         Map<Long, LeaveRequest> leaveMap = approvedLeaves.stream()
-            .collect(Collectors.toMap(LeaveRequest::getStudentId, lr -> lr, (a, b) -> a));
+            .collect(Collectors.toMap(LeaveRequest::getStudentId, lr -> lr,
+                (a, b) -> a.getSessionId() != null ? a : b)); // 优先保留特定签到活动的请假
 
         // 异常检测（同名设备签到）
         Map<String, Integer> deviceCount = new HashMap<>();
