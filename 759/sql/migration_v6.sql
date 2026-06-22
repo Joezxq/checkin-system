@@ -61,4 +61,9 @@ INSERT INTO system_config (config_key, config_value, config_type, description) V
 ('default_export_format', 'csv', 'STRING', '默认导出格式')
 ON DUPLICATE KEY UPDATE config_value=VALUES(config_value);
 
+-- 默认管理员账号 (admin / password)
+INSERT INTO admin (username, name, password_hash, status) VALUES
+('admin', '系统管理员', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ACTIVE')
+ON DUPLICATE KEY UPDATE username=username;
+
 SET FOREIGN_KEY_CHECKS = 1;
