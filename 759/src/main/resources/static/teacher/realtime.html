@@ -71,9 +71,19 @@ const extendModal=new bootstrap.Modal(document.getElementById('extendModal'));
 
 async function load(){
     const d=await get(`/api/teacher/sessions/${sessionId}/realtime`);
+    window._lastCourseId=d.courseId; // 供二维码URL使用
+    // 异步加载风险数据（不阻塞主流程）
+    if(d.courseId&&!window._riskLoading){
+        window._riskLoading=true;
+        try{
+            const scores=await get(`/api/teacher/courses/${d.courseId}/risk/scores`);
+            const map={};
+            (scores||[]).forEach(r=>{map[r.studentId]=r.riskLevel;});
+            window._riskMap=map;
+        }catch(e){window._riskMap={};}
+        window._riskLoading=false;
+    }
     const isActive = d.status === 'IN_PROGRESS';
-
-    // Update nav title
     document.getElementById('navTitle').textContent = d.title || '实时签到';
 
     // Status badge
@@ -139,20 +149,27 @@ function renderUnsignedList(d){
     if(!d.unsignedStudents||d.unsignedStudents.length===0){
         el.innerHTML='<div class="text-center py-3 text-muted">🎉 全部已签到！</div>'; return;
     }
-    el.innerHTML=`<table class="table table-sm table-hover mb-0"><thead><tr><th>学号</th><th>姓名</th><th>班级</th></tr></thead><tbody>${
-        d.unsignedStudents.map(s=>`<tr class="unsigned-row"><td><small>${escapeHtml(s.studentNo)}</small></td><td>${escapeHtml(s.name)}</td><td><small class="text-muted">${escapeHtml(s.className||'')}</small></td></tr>`).join('')
+    const riskMap=window._riskMap||{};
+    const riskBadge=studentId=>{const r=riskMap[studentId];if(!r)return'';const c=r==='HIGH'?'danger':r==='MEDIUM'?'warning':'success';const t=r==='HIGH'?'⚠高':r==='MEDIUM'?'⚡中':'';return t?` <span class="badge bg-${c} ms-1" style="font-size:0.65rem;">${t}</span>`:'';};
+    const riskRow=studentId=>{const r=riskMap[studentId];return r==='HIGH'?'style="background:rgba(220,53,69,0.08);"':r==='MEDIUM'?'style="background:rgba(255,193,7,0.05);"':'';};
+    el.innerHTML=`<table class="table table-sm table-hover mb-0"><thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>风险</th></tr></thead><tbody>${
+        d.unsignedStudents.map(s=>`<tr ${riskRow(s.id)}><td><small>${escapeHtml(s.studentNo)}</small></td><td>${escapeHtml(s.name)}${riskBadge(s.id)}</td><td><small class="text-muted">${escapeHtml(s.className||'')}</small></td><td>${riskBadge(s.id)}</td></tr>`).join('')
     }</tbody></table>`;
 }
 
 function renderQR(token){
     const el=document.getElementById('qrcode');
     el.innerHTML='';
+    // 构建完整URL：学生扫码后浏览器自动打开签到页，自动填入token完成签到
+    // Get courseId from last API response (stored globally)
+    const cid=window._lastCourseId||'';
+    const baseUrl=window.location.origin;
+    const signUrl=`${baseUrl}/student/sign.html?courseId=${cid}&sid=${sessionId}&token=${token}`;
     try{
-        qr=new QRCode(el,{text:`CHECKIN:${sessionId}:${token}`,width:200,height:200,colorDark:'#7c5cfc',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
-        document.getElementById('qrText').textContent=`CHECKIN:${sessionId}:${token}`;
+        qr=new QRCode(el,{text:signUrl,width:220,height:220,colorDark:'#7c5cfc',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+        document.getElementById('qrText').innerHTML=`<small class="text-success">📱 学生扫码即可签到</small><br><code style="font-size:0.7rem;word-break:break-all;">${signUrl}</code>`;
     }catch(e){
-        el.innerHTML=`<div class="alert alert-warning text-center mb-0">二维码库加载失败<br><small class="text-muted">请使用手动签到</small></div>`;
-        document.getElementById('qrText').textContent=`CHECKIN:${sessionId}:${token}`;
+        el.innerHTML=`<div class="alert alert-warning text-center mb-0">二维码库加载失败<br><small class="text-muted">请使用手动签到: <code>${signUrl}</code></small></div>`;
     }
 }
 

@@ -34,7 +34,24 @@ if(hasSigned){
     el.innerHTML=`<h5 class="mb-3">📋 签到进行中</h5>${titleHtml}${timeHtml}<button class="btn btn-success sign-btn mx-auto my-3 py-0" onclick="signIn(${session.id})">点击<br>签到</button>`;
 }}catch(e){if(e.message.includes('未登录'))navigateTo('/student/login.html');else showError(e.message);}}
 async function signIn(id){try{await post(`/api/student/session/${id}/sign`);showSuccess('签到成功！');setTimeout(checkSession,1000);}catch(e){showError(e.message);}}
-async function qrSignIn(){const input=document.getElementById('qrInput').value.trim();const errEl=document.getElementById('qrError');errEl.classList.add('d-none');if(!input){errEl.textContent='请输入QR码文本';errEl.classList.remove('d-none');return;}const parts=input.split(':');if(parts.length<3||parts[0]!=='CHECKIN'){errEl.textContent='无效的QR码格式';errEl.classList.remove('d-none');return;}const sid=parts[1];const token=parts.slice(2).join(':');try{const result=await post(`/api/student/session/${sid}/qrsign`,{token});showSuccess('扫码签到成功！');document.getElementById('qrInput').value='';if(sid==activeSessionId)setTimeout(checkSession,1000);}catch(e){errEl.textContent=e.message;errEl.classList.remove('d-none');}}
+async function qrSignIn(sid,token){if(!sid)sid=activeSessionId;const input=document.getElementById('qrInput').value.trim();const errEl=document.getElementById('qrError');errEl.classList.add('d-none');
+    if(!token){const t=input;if(!t){errEl.textContent='请输入QR码文本';errEl.classList.remove('d-none');return;}
+    // 支持两种格式: 旧格式 CHECKIN:sid:token  新格式 URL参数 ?sid=X&token=Y
+    if(t.startsWith('CHECKIN:')){const parts=t.split(':');if(parts.length<3){errEl.textContent='无效的QR码格式';errEl.classList.remove('d-none');return;}sid=parts[1];token=parts.slice(2).join(':');}
+    else if(t.includes('sid=')&&t.includes('token=')){const u=new URL(t);sid=u.searchParams.get('sid');token=u.searchParams.get('token');}
+    else{errEl.textContent='无效的QR码格式';errEl.classList.remove('d-none');return;}}
+    try{await post(`/api/student/session/${sid}/qrsign`,{token});showSuccess('扫码签到成功！');document.getElementById('qrInput').value='';window._autoSigned=true;setTimeout(checkSession,500);}
+    catch(e){errEl.textContent=e.message;errEl.classList.remove('d-none');}}
+// 自动检测URL参数：学生扫码打开页面时自动完成签到
+(function autoQR(){
+    const sid=getUrlParam('sid');
+    const token=getUrlParam('token');
+    if(sid&&token){
+        document.getElementById('qrInput').value='CHECKIN:'+sid+':'+token;
+        // 等待页面加载完成后自动提交
+        setTimeout(()=>{if(!window._autoSigned)qrSignIn(sid,token);},1500);
+    }
+})();
 checkSession();
 </script>
 </body></html>
