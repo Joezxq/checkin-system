@@ -5,7 +5,6 @@ package com.checkin.enums;
  */
 public enum AttendanceStatus {
     NORMAL("正常签到"),
-    LATE("迟到"),
     LEAVE("请假"),
     ABSENT("缺勤"),
     ABNORMAL("异常签到");

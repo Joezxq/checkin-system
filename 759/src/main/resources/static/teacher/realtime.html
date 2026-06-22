@@ -103,8 +103,7 @@ async function load(){
 
     // Session times
     let timeInfo = `开始: ${formatDateTime(d.startTime)} | 截止: ${d.endTime?formatDateTime(d.endTime):'--'}`;
-    if(d.normalEndTime) timeInfo += ` | 正常: ${formatDateTime(d.normalEndTime)}`;
-    if(d.lateEndTime) timeInfo += ` | 迟到: ${formatDateTime(d.lateEndTime)}`;
+    if(d.normalEndTime) timeInfo += ` | 正常截止: ${formatDateTime(d.normalEndTime)}`;
     document.getElementById('sessionTimes').textContent = timeInfo;
 
     // QR code
@@ -156,8 +155,8 @@ function renderUnsignedList(d){
         el.innerHTML='<div class="text-center py-3 text-muted">🎉 全部已签到！</div>'; return;
     }
     const riskMap=window._riskMap||{};
-    const riskBadge=studentId=>{const r=riskMap[studentId];if(!r)return'';const c=r==='HIGH'?'danger':r==='MEDIUM'?'warning':'success';const t=r==='HIGH'?'⚠高':r==='MEDIUM'?'⚡中':'';return t?` <span class="badge bg-${c} ms-1" style="font-size:0.65rem;">${t}</span>`:'';};
-    const riskRow=studentId=>{const r=riskMap[studentId];return r==='HIGH'?'style="background:rgba(220,53,69,0.08);"':r==='MEDIUM'?'style="background:rgba(255,193,7,0.05);"':'';};
+    const riskBadge=studentId=>{const r=riskMap[studentId];if(!r)return'';const c=r==='HIGH'?'danger':r==='MEDIUM'?'warning':'success';const t=r==='HIGH'?'📌多次缺勤':r==='MEDIUM'?'⚡需关注':'';return t?` <span class="badge bg-${c} ms-1" style="font-size:0.65rem;">${t}</span>`:'';};
+    const riskRow=studentId=>{const r=riskMap[studentId];return r==='HIGH'?'style="background:rgba(220,53,69,0.1);font-weight:500;"':r==='MEDIUM'?'style="background:rgba(255,193,7,0.05);"':'';};
     el.innerHTML=`<table class="table table-sm table-hover mb-0"><thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>风险</th></tr></thead><tbody>${
         d.unsignedStudents.map(s=>`<tr ${riskRow(s.id)}><td><small>${escapeHtml(s.studentNo)}</small></td><td>${escapeHtml(s.name)}${riskBadge(s.id)}</td><td><small class="text-muted">${escapeHtml(s.className||'')}</small></td><td>${riskBadge(s.id)}</td></tr>`).join('')
     }</tbody></table>`;
@@ -210,9 +209,9 @@ function showStats(s){
         <div class="col-3"><div class="border rounded p-2"><div class="fw-bold fs-5">${s.totalCount}</div><small class="text-muted">总人数</small></div></div>
         <div class="col-3"><div class="border rounded p-2"><div class="fw-bold fs-5 text-success">${s.signedCount}</div><small class="text-muted">已签到</small></div></div>
         <div class="col-3"><div class="border rounded p-2"><div class="fw-bold fs-5 text-danger">${s.unsignedCount}</div><small class="text-muted">未签到</small></div></div>
-        <div class="col-3"><div class="border rounded p-2"><div class="fw-bold fs-5 text-warning">${s.lateCount||0}</div><small class="text-muted">迟到</small></div></div>
+        <div class="col-3"><div class="border rounded p-2"><div class="fw-bold fs-5 text-primary">${s.leaveCount||0}</div><small class="text-muted">请假</small></div></div>
     </div>
-    <div class="row g-2"><div class="col"><div class="border rounded p-2"><div class="fw-bold text-success">${s.normalCount||0}</div><small class="text-muted">✅ 正常</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-warning">${s.lateCount||0}</div><small class="text-muted">⚠️ 迟到</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-primary">${s.leaveCount||0}</div><small class="text-muted">📝 请假</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-danger">${s.absentCount||0}</div><small class="text-muted">❌ 缺勤</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-info">${s.abnormalCount||0}</div><small class="text-muted">⚠️ 异常</small></div></div></div>
+    <div class="row g-2"><div class="col"><div class="border rounded p-2"><div class="fw-bold text-success">${s.normalCount||0}</div><small class="text-muted">✅ 正常</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-primary">${s.leaveCount||0}</div><small class="text-muted">📝 请假</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-danger">${s.absentCount||0}</div><small class="text-muted">❌ 缺勤</small></div></div><div class="col"><div class="border rounded p-2"><div class="fw-bold text-info">${s.abnormalCount||0}</div><small class="text-muted">⚠️ 异常</small></div></div></div>
 </div><div class="modal-footer"><button class="btn btn-gradient" data-bs-dismiss="modal">确定</button></div></div></div></div>`;
     const w=document.createElement('div');w.innerHTML=m;document.body.appendChild(w.firstElementChild);
     const modal=new bootstrap.Modal(document.body.lastElementChild);modal.show();

@@ -66,20 +66,17 @@ public class RiskService {
             .filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus()))
             .count();
         long consecutiveAbsences = countConsecutiveAbsences(results);
-        long lateCount = results.stream().filter(r -> AttendanceStatus.LATE.name().equals(r.getStatus())).count();
         long abnormalCount = results.stream().filter(r -> AttendanceStatus.ABNORMAL.name().equals(r.getStatus())).count();
 
         double historyAbsenceRate = totalSessions > 0 ? (double) absentCount / totalSessions : 0;
         double recentAbsenceRate = Math.min(5, totalSessions) > 0
             ? (double) recentAbsentCount / Math.min(5, totalSessions) : 0;
-        double lateRate = totalSessions > 0 ? (double) lateCount / totalSessions : 0;
 
-        // 加权评分公式
+        // 加权评分公式（已取消迟到率，加重连续缺勤权重）
         double score = 0;
         score += historyAbsenceRate * 35;
-        score += recentAbsenceRate * 25;
-        score += Math.min(consecutiveAbsences, 3) * 5;
-        score += lateRate * 10;
+        score += recentAbsenceRate * 30;
+        score += Math.min(consecutiveAbsences, 3) * 8;
         score += Math.min(abnormalCount * 5, 10);
 
         int finalScore = (int) Math.min(Math.round(score), 100);
@@ -93,8 +90,8 @@ public class RiskService {
         riskScore.setScore(finalScore);
         riskScore.setRiskLevel(level.name());
         riskScore.setMetrics(String.format(
-            "{\"historyAbsenceRate\":%.2f,\"recentAbsenceRate\":%.2f,\"consecutiveAbsences\":%d,\"lateRate\":%.2f,\"abnormalCount\":%d}",
-            historyAbsenceRate, recentAbsenceRate, consecutiveAbsences, lateRate, abnormalCount));
+            "{\"historyAbsenceRate\":%.2f,\"recentAbsenceRate\":%.2f,\"consecutiveAbsences\":%d,\"abnormalCount\":%d}",
+            historyAbsenceRate, recentAbsenceRate, consecutiveAbsences, abnormalCount));
         riskScore.setPrediction(buildPrediction(level, finalScore, consecutiveAbsences));
         riskScore.setCalculatedAt(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
 

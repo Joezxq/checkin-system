@@ -238,26 +238,12 @@ public class AttendanceService {
                     result.setStatus(AttendanceStatus.ABNORMAL.name());
                     result.setAbnormalReason("同一设备被多个学生使用签到");
                 }
-                // 判断正常/迟到
+                // 判断正常/缺勤（已取消迟到状态，晚于截止时间一律为缺勤）
                 else if (session.getNormalEndTime() != null
                         && !record.getSignTime().isAfter(session.getNormalEndTime())) {
                     result.setStatus(AttendanceStatus.NORMAL.name());
-                } else if (session.getAllowLate() && session.getLateEndTime() != null
-                        && !record.getSignTime().isAfter(session.getLateEndTime())) {
-                    result.setStatus(AttendanceStatus.LATE.name());
-                } else if (session.getNormalEndTime() != null) {
-                    // 签到晚于正常截止时间
-                    if (session.getAllowLate() && session.getLateEndTime() != null) {
-                        // 有迟到宽限且签到在迟到截止之后 -> 缺勤
-                        result.setStatus(AttendanceStatus.ABSENT.name());
-                    } else if (!session.getAllowLate() || session.getLateEndTime() == null) {
-                        // 不允许迟到 或 迟到时间为空 -> 缺勤
-                        result.setStatus(AttendanceStatus.ABSENT.name());
-                    } else {
-                        result.setStatus(AttendanceStatus.LATE.name());
-                    }
                 } else {
-                    result.setStatus(AttendanceStatus.NORMAL.name());
+                    result.setStatus(AttendanceStatus.ABSENT.name());
                 }
             } else {
                 // 无签到记录且无有效请假 → ABSENT
@@ -538,7 +524,6 @@ public class AttendanceService {
         // 从考勤结果获取详细统计
         List<AttendanceResult> results = resultRepository.findBySessionId(sessionId);
         long normalCount = results.stream().filter(r -> AttendanceStatus.NORMAL.name().equals(r.getStatus())).count();
-        long lateCount = results.stream().filter(r -> AttendanceStatus.LATE.name().equals(r.getStatus())).count();
         long leaveCount = results.stream().filter(r -> AttendanceStatus.LEAVE.name().equals(r.getStatus())).count();
         long absentCount = results.stream().filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus())).count();
         long abnormalCount = results.stream().filter(r -> AttendanceStatus.ABNORMAL.name().equals(r.getStatus())).count();
@@ -558,7 +543,7 @@ public class AttendanceService {
         result.put("unsignedCount", unsignedCount);
         result.put("attendanceRate", attendanceRate);
         result.put("normalCount", normalCount);
-        result.put("lateCount", lateCount);
+        result.put("lateCount", 0L);
         result.put("leaveCount", leaveCount);
         result.put("absentCount", absentCount);
         result.put("abnormalCount", abnormalCount);
@@ -593,7 +578,6 @@ public class AttendanceService {
             // 获取状态细分
             List<AttendanceResult> results = resultRepository.findBySessionId(session.getId());
             long normalCount = results.stream().filter(r -> AttendanceStatus.NORMAL.name().equals(r.getStatus())).count();
-            long lateCount = results.stream().filter(r -> AttendanceStatus.LATE.name().equals(r.getStatus())).count();
             long leaveCount = results.stream().filter(r -> AttendanceStatus.LEAVE.name().equals(r.getStatus())).count();
             long absentCount = results.stream().filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus())).count();
             long abnormalCount = results.stream().filter(r -> AttendanceStatus.ABNORMAL.name().equals(r.getStatus())).count();
@@ -608,7 +592,7 @@ public class AttendanceService {
             stat.put("signedCount", signedCount);
             stat.put("attendanceRate", rate);
             stat.put("normalCount", normalCount);
-            stat.put("lateCount", lateCount);
+            stat.put("lateCount", 0L);
             stat.put("leaveCount", leaveCount);
             stat.put("absentCount", absentCount);
             stat.put("abnormalCount", abnormalCount);
@@ -655,7 +639,6 @@ public class AttendanceService {
         }
 
         long normalCount = allResults.stream().filter(r -> AttendanceStatus.NORMAL.name().equals(r.getStatus())).count();
-        long lateCount = allResults.stream().filter(r -> AttendanceStatus.LATE.name().equals(r.getStatus())).count();
         long leaveCount = allResults.stream().filter(r -> AttendanceStatus.LEAVE.name().equals(r.getStatus())).count();
         long absentCount = allResults.stream().filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus())).count();
         long abnormalCount = allResults.stream().filter(r -> AttendanceStatus.ABNORMAL.name().equals(r.getStatus())).count();
@@ -693,7 +676,7 @@ public class AttendanceService {
         result.put("averageRate", averageRate);
         result.put("lastRate", lastRate);
         result.put("normalCount", normalCount);
-        result.put("lateCount", lateCount);
+        result.put("lateCount", 0L);
         result.put("leaveCount", leaveCount);
         result.put("absentCount", absentCount);
         result.put("abnormalCount", abnormalCount);
@@ -731,7 +714,6 @@ public class AttendanceService {
 
         long totalCount = results.size();
         long normalCount = results.stream().filter(r -> AttendanceStatus.NORMAL.name().equals(r.getStatus())).count();
-        long lateCount = results.stream().filter(r -> AttendanceStatus.LATE.name().equals(r.getStatus())).count();
         long leaveCount = results.stream().filter(r -> AttendanceStatus.LEAVE.name().equals(r.getStatus())).count();
         long absentCount = results.stream().filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus())).count();
         long abnormalCount = results.stream().filter(r -> AttendanceStatus.ABNORMAL.name().equals(r.getStatus())).count();
@@ -742,7 +724,7 @@ public class AttendanceService {
         Map<String, Object> result = new HashMap<>();
         result.put("totalSessions", totalCount);
         result.put("normalCount", normalCount);
-        result.put("lateCount", lateCount);
+        result.put("lateCount", 0L);
         result.put("leaveCount", leaveCount);
         result.put("absentCount", absentCount);
         result.put("abnormalCount", abnormalCount);
@@ -789,7 +771,7 @@ public class AttendanceService {
 
         Map<String, Object> distribution = new HashMap<>();
         distribution.put("NORMAL", dashboard.get("normalCount"));
-        distribution.put("LATE", dashboard.get("lateCount"));
+        distribution.put("LATE", 0L);
         distribution.put("LEAVE", dashboard.get("leaveCount"));
         distribution.put("ABSENT", dashboard.get("absentCount"));
         distribution.put("ABNORMAL", dashboard.get("abnormalCount"));
