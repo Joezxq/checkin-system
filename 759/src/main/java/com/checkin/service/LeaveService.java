@@ -118,8 +118,9 @@ public class LeaveService {
 
         LeaveRequest saved = leaveRequestRepository.save(leaveRequest);
 
-        // 如果有关联的考勤结果记录，更新状态为 LEAVE
+        // 更新已存在的考勤结果状态为 LEAVE
         if (leaveRequest.getSessionId() != null) {
+            // 针对特定签到活动的请假：只更新该场次的结果
             attendanceResultRepository.findBySessionIdAndStudentId(
                     leaveRequest.getSessionId(), leaveRequest.getStudentId())
                 .ifPresent(result -> {
@@ -127,6 +128,19 @@ public class LeaveService {
                     result.setLeaveRequestId(leaveId);
                     attendanceResultRepository.save(result);
                 });
+        } else {
+            // 课程级请假（sessionId==null）：更新该学生在此课程下所有已有的考勤结果
+            List<com.checkin.entity.AttendanceResult> allResults =
+                attendanceResultRepository.findByCourseIdAndStudentId(
+                    leaveRequest.getCourseId(), leaveRequest.getStudentId());
+            for (com.checkin.entity.AttendanceResult result : allResults) {
+                // 仅更新非 NORMAL 状态的记录（如 ABSENT -> LEAVE），保护已有正常签到记录
+                if (!com.checkin.enums.AttendanceStatus.NORMAL.name().equals(result.getStatus())) {
+                    result.setStatus(com.checkin.enums.AttendanceStatus.LEAVE.name());
+                    result.setLeaveRequestId(leaveId);
+                    attendanceResultRepository.save(result);
+                }
+            }
         }
 
         logger.info("教师 {} 批准了学生 {} 的请假申请, leaveId={}", teacherId, leaveRequest.getStudentId(), leaveId);

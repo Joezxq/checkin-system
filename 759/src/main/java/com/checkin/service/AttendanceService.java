@@ -190,10 +190,18 @@ public class AttendanceService {
         Map<Long, AttendanceRecord> recordMap = records.stream()
             .collect(Collectors.toMap(AttendanceRecord::getStudentId, r -> r, (a, b) -> a));
 
-        // 获取本课程所有已批准的请假（无特定学生ID，使用课程查询）
+        // 获取本课程所有已批准的请假
         List<LeaveRequest> approvedLeaves = leaveService.getApprovedLeavesForCourse(
                 session.getCourseId()).stream()
-            .filter(lr -> lr.getSessionId() == null || lr.getSessionId().equals(sessionId))
+            .filter(lr -> {
+                // 针对特定场次的请假：直接匹配
+                if (lr.getSessionId() != null) {
+                    return lr.getSessionId().equals(sessionId);
+                }
+                // 课程级请假：仅对请假提交时间之后的场次生效，防止事后请假覆盖历史缺勤
+                return lr.getCreatedAt() != null
+                    && !session.getStartTime().isBefore(lr.getCreatedAt());
+            })
             .collect(Collectors.toList());
         Map<Long, LeaveRequest> leaveMap = approvedLeaves.stream()
             .collect(Collectors.toMap(LeaveRequest::getStudentId, lr -> lr,
@@ -562,21 +570,33 @@ public class AttendanceService {
             throw new BusinessException(403, "无权限查看此课程统计数据");
         }
 
-        List<AttendanceSession> sessions = sessionRepository.findByCourseId(courseId);
+        List<AttendanceSession> allSessions = sessionRepository.findByCourseId(courseId);
+        List<AttendanceSession> sessions = allSessions.stream()
+            .filter(s -> SessionStatus.CLOSED.name().equals(s.getStatus()))
+            .sorted((a, b) -> b.getStartTime().compareTo(a.getStartTime()))
+            .collect(Collectors.toList());
         int totalSessions = sessions.size();
         List<Map<String, Object>> sessionStats = new ArrayList<>();
+
+        // 批量加载考勤结果（消除 N+1）
+        List<Long> sessionIds = sessions.stream().map(AttendanceSession::getId).collect(Collectors.toList());
+        Map<Long, List<AttendanceResult>> resultsBySession = sessionIds.isEmpty()
+            ? new HashMap<>()
+            : resultRepository.findBySessionIdIn(sessionIds).stream()
+                .collect(Collectors.groupingBy(AttendanceResult::getSessionId));
 
         double totalRate = 0;
         int sessionsWithRecords = 0;
 
         for (AttendanceSession session : sessions) {
-            List<Long> allStudentIds = enrollmentService.getCourseStudentIds(session.getCourseId());
-            int totalCount = allStudentIds.size();
-            long signedCount = recordRepository.countBySessionId(session.getId());
-            double rate = totalCount > 0 ? Math.round(signedCount * 1000.0 / totalCount) / 10.0 : 0.0;
+            List<AttendanceResult> results = resultsBySession.getOrDefault(session.getId(), new ArrayList<>());
+            int totalCount = results.size();
+            long presentCount = results.stream()
+                .filter(r -> !AttendanceStatus.ABSENT.name().equals(r.getStatus()))
+                .count();
+            double rate = totalCount > 0 ? Math.round(presentCount * 1000.0 / totalCount) / 10.0 : 0.0;
 
             // 获取状态细分
-            List<AttendanceResult> results = resultRepository.findBySessionId(session.getId());
             long normalCount = results.stream().filter(r -> AttendanceStatus.NORMAL.name().equals(r.getStatus())).count();
             long leaveCount = results.stream().filter(r -> AttendanceStatus.LEAVE.name().equals(r.getStatus())).count();
             long absentCount = results.stream().filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus())).count();
@@ -589,7 +609,7 @@ public class AttendanceService {
             stat.put("endTime", session.getEndTime() != null ? formatDateTime(session.getEndTime()) : null);
             stat.put("status", session.getStatus());
             stat.put("totalCount", totalCount);
-            stat.put("signedCount", signedCount);
+            stat.put("signedCount", presentCount);
             stat.put("attendanceRate", rate);
             stat.put("normalCount", normalCount);
             stat.put("lateCount", 0L);
@@ -629,30 +649,44 @@ public class AttendanceService {
             throw new BusinessException(403, "无权限查看此课程数据");
         }
 
-        List<AttendanceSession> sessions = sessionRepository.findByCourseId(courseId);
+        // 只统计已关闭的签到活动（只有 CLOSED 状态才生成了考勤结果）
+        List<AttendanceSession> allSessions = sessionRepository.findByCourseId(courseId);
+        List<AttendanceSession> sessions = allSessions.stream()
+            .filter(s -> SessionStatus.CLOSED.name().equals(s.getStatus()))
+            .sorted((a, b) -> b.getStartTime().compareTo(a.getStartTime()))
+            .collect(Collectors.toList());
         int totalSessions = sessions.size();
 
-        // 汇总所有考勤结果
-        List<AttendanceResult> allResults = new ArrayList<>();
-        for (AttendanceSession session : sessions) {
-            allResults.addAll(resultRepository.findBySessionId(session.getId()));
-        }
+        // 批量加载所有考勤结果（消除 N+1）
+        List<Long> sessionIds = sessions.stream().map(AttendanceSession::getId).collect(Collectors.toList());
+        List<AttendanceResult> allResults = sessionIds.isEmpty()
+            ? new ArrayList<>()
+            : resultRepository.findBySessionIdIn(sessionIds);
+
+        // 按 sessionId 分组，用于计算每场签到的实际人数
+        Map<Long, List<AttendanceResult>> resultsBySession = allResults.stream()
+            .collect(Collectors.groupingBy(AttendanceResult::getSessionId));
 
         long normalCount = allResults.stream().filter(r -> AttendanceStatus.NORMAL.name().equals(r.getStatus())).count();
         long leaveCount = allResults.stream().filter(r -> AttendanceStatus.LEAVE.name().equals(r.getStatus())).count();
         long absentCount = allResults.stream().filter(r -> AttendanceStatus.ABSENT.name().equals(r.getStatus())).count();
         long abnormalCount = allResults.stream().filter(r -> AttendanceStatus.ABNORMAL.name().equals(r.getStatus())).count();
 
+        // 当前选课人数（仅用于前端展示）
         List<Long> enrolledStudentIds = enrollmentService.getCourseStudentIds(courseId);
         int totalStudents = enrolledStudentIds.size();
 
-        // 计算平均出勤率
+        // 计算平均出勤率：每场签到使用该场次实际考勤人数作为分母
         double averageRate = 0;
         int sessionsWithData = 0;
         for (AttendanceSession session : sessions) {
-            long signedCount = recordRepository.countBySessionId(session.getId());
-            if (totalStudents > 0) {
-                averageRate += Math.round(signedCount * 1000.0 / totalStudents) / 10.0;
+            List<AttendanceResult> sessionResults = resultsBySession.getOrDefault(session.getId(), new ArrayList<>());
+            int actualTotal = sessionResults.size();
+            if (actualTotal > 0) {
+                long presentCount = sessionResults.stream()
+                    .filter(r -> !AttendanceStatus.ABSENT.name().equals(r.getStatus()))
+                    .count();
+                averageRate += Math.round(presentCount * 1000.0 / actualTotal) / 10.0;
                 sessionsWithData++;
             }
         }
@@ -660,12 +694,18 @@ public class AttendanceService {
             ? Math.round(averageRate * 10.0 / sessionsWithData) / 10.0
             : 0.0;
 
-        // 最近一次签到率
+        // 最近一次签到率（sessions 已按 startTime DESC 排序，第一条即最新）
         double lastRate = 0;
         if (!sessions.isEmpty()) {
-            AttendanceSession lastSession = sessions.get(sessions.size() - 1);
-            long lastSigned = recordRepository.countBySessionId(lastSession.getId());
-            lastRate = totalStudents > 0 ? Math.round(lastSigned * 1000.0 / totalStudents) / 10.0 : 0.0;
+            AttendanceSession lastSession = sessions.get(0);
+            List<AttendanceResult> lastResults = resultsBySession.getOrDefault(lastSession.getId(), new ArrayList<>());
+            int lastTotal = lastResults.size();
+            if (lastTotal > 0) {
+                long lastPresent = lastResults.stream()
+                    .filter(r -> !AttendanceStatus.ABSENT.name().equals(r.getStatus()))
+                    .count();
+                lastRate = Math.round(lastPresent * 1000.0 / lastTotal) / 10.0;
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -690,9 +730,18 @@ public class AttendanceService {
     public List<Map<String, Object>> getStudentAttendanceHistory(Long studentId, Long courseId) {
         List<AttendanceResult> results = resultRepository.findByCourseIdAndStudentId(courseId, studentId);
 
+        // 批量加载所有关联的签到活动（消除 N+1）
+        Set<Long> sessionIds = results.stream()
+            .map(AttendanceResult::getSessionId)
+            .collect(Collectors.toSet());
+        Map<Long, AttendanceSession> sessionMap = sessionIds.isEmpty()
+            ? new HashMap<>()
+            : sessionRepository.findAllById(sessionIds).stream()
+                .collect(Collectors.toMap(AttendanceSession::getId, s -> s));
+
         List<Map<String, Object>> history = new ArrayList<>();
         for (AttendanceResult result : results) {
-            AttendanceSession session = sessionRepository.findById(result.getSessionId()).orElse(null);
+            AttendanceSession session = sessionMap.get(result.getSessionId());
             Map<String, Object> item = new HashMap<>();
             item.put("sessionId", result.getSessionId());
             item.put("sessionTitle", session != null ? session.getTitle() : null);
@@ -744,13 +793,27 @@ public class AttendanceService {
             throw new BusinessException(403, "无权限查看此课程数据");
         }
 
-        List<AttendanceSession> sessions = sessionRepository.findByCourseId(courseId);
-        int totalStudents = enrollmentService.getCourseStudentIds(courseId).size();
+        List<AttendanceSession> allSessions = sessionRepository.findByCourseId(courseId);
+        List<AttendanceSession> sessions = allSessions.stream()
+            .filter(s -> SessionStatus.CLOSED.name().equals(s.getStatus()))
+            .sorted((a, b) -> a.getStartTime().compareTo(b.getStartTime()))
+            .collect(Collectors.toList());
+
+        // 批量加载考勤结果（用于计算每场实际出勤率）
+        List<Long> sessionIds = sessions.stream().map(AttendanceSession::getId).collect(Collectors.toList());
+        Map<Long, List<AttendanceResult>> resultsBySession = sessionIds.isEmpty()
+            ? new HashMap<>()
+            : resultRepository.findBySessionIdIn(sessionIds).stream()
+                .collect(Collectors.groupingBy(AttendanceResult::getSessionId));
 
         List<Map<String, Object>> trend = new ArrayList<>();
         for (AttendanceSession session : sessions) {
-            long signedCount = recordRepository.countBySessionId(session.getId());
-            double rate = totalStudents > 0 ? Math.round(signedCount * 1000.0 / totalStudents) / 10.0 : 0.0;
+            List<AttendanceResult> results = resultsBySession.getOrDefault(session.getId(), new ArrayList<>());
+            int actualTotal = results.size();
+            long presentCount = results.stream()
+                .filter(r -> !AttendanceStatus.ABSENT.name().equals(r.getStatus()))
+                .count();
+            double rate = actualTotal > 0 ? Math.round(presentCount * 1000.0 / actualTotal) / 10.0 : 0.0;
 
             Map<String, Object> point = new HashMap<>();
             point.put("sessionId", session.getId());
